@@ -210,36 +210,54 @@ def validate_input(
 _GLYPH = {LEVEL_OK: "OK  ", LEVEL_WARN: "WARN", LEVEL_ERROR: "ERR "}
 _CHECK_ORDER = ("video", "timing", "predictions", "log")
 
+# ANSI colors: green = valid, yellow = warning (works, but beware), red = error.
+_ANSI = {LEVEL_OK: "\033[32m", LEVEL_WARN: "\033[33m", LEVEL_ERROR: "\033[31m"}
+_ANSI_BOLD = "\033[1m"
+_ANSI_RESET = "\033[0m"
 
-def format_report(report: Report) -> str:
+
+def _paint(text: str, level: str, color: bool, *, bold: bool = False) -> str:
+    """Wrap ``text`` in the ANSI color for ``level`` when ``color`` is on."""
+    if not color or level not in _ANSI:
+        return text
+    return f"{_ANSI_BOLD if bold else ''}{_ANSI[level]}{text}{_ANSI_RESET}"
+
+
+def format_report(report: Report, *, color: bool = False) -> str:
     lines: list[str] = []
     lines.append(f"Validating: {report.root}  ({len(report.recordings)} recording(s))")
     if not report.recordings:
         lines.append("")
         lines.append(f"  No .avi recordings found under {report.root}")
         lines.append("")
-        lines.append("Result: FAIL (nothing to validate)")
+        lines.append(_paint("Result: FAIL (nothing to validate)", LEVEL_ERROR, color, bold=True))
         return "\n".join(lines)
 
     for rec in report.recordings:
-        flag = "" if rec.ok else "   <-- FAIL"
+        flag = "" if rec.ok else _paint("   <-- FAIL", LEVEL_ERROR, color, bold=True)
         lines.append("")
         lines.append(f"  {_video_stem(rec.video)}{flag}")
         for name in _CHECK_ORDER:
             chk = rec.checks.get(name)
             if chk is None:
                 continue
-            lines.append(f"    {name:<12} {_GLYPH[chk.level]}  {chk.detail}")
+            glyph = _paint(_GLYPH[chk.level], chk.level, color, bold=True)
+            lines.append(f"    {name:<12} {glyph}  {chk.detail}")
 
     n_ok = sum(r.ok for r in report.recordings)
     n_bad = len(report.recordings) - n_ok
     n_warn = sum(r.n_warn for r in report.recordings)
     n_err = sum(r.n_error for r in report.recordings)
+    verdict = _paint(
+        "PASS" if report.ok else "FAIL",
+        LEVEL_OK if report.ok else LEVEL_ERROR,
+        color,
+        bold=True,
+    )
     lines.append("")
     lines.append(
         f"Summary: {n_ok} OK, {n_bad} with issues "
-        f"({n_warn} warning(s), {n_err} error(s))  ->  "
-        f"{'PASS' if report.ok else 'FAIL'}"
+        f"({n_warn} warning(s), {n_err} error(s))  ->  {verdict}"
     )
     return "\n".join(lines)
 

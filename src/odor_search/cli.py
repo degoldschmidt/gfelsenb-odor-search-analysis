@@ -60,6 +60,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Warn if an .slp has fewer labeled frames (default: 100)",
     )
     ip.add_argument("--json", action="store_true", help="Emit a JSON report")
+    ip.add_argument(
+        "--color", choices=("auto", "always", "never"), default="auto",
+        help="Colorize output: green=valid, yellow=warning, red=error "
+             "(default: auto = only when writing to a terminal).",
+    )
 
     # Pipeline stages (stubs for now).
     for name in STAGES:
@@ -75,6 +80,16 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _resolve_color(mode: str) -> bool:
+    if mode == "always":
+        return True
+    if mode == "never":
+        return False
+    import os  # auto: color only for an interactive terminal, honoring NO_COLOR.
+
+    return sys.stdout.isatty() and os.environ.get("NO_COLOR") is None
+
+
 def _run_input(args: argparse.Namespace) -> int:
     from .validate import format_report, report_to_json, validate_input
 
@@ -84,7 +99,10 @@ def _run_input(args: argparse.Namespace) -> int:
         time_column=args.time_column,
         min_slp_frames=args.min_frames,
     )
-    print(report_to_json(report) if args.json else format_report(report))
+    if args.json:
+        print(report_to_json(report))
+    else:
+        print(format_report(report, color=_resolve_color(args.color)))
     return 0 if report.ok else 1
 
 

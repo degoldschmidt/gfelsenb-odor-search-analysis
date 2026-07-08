@@ -90,3 +90,14 @@ def test_validate_input_orchestrates_without_raising(tmp_path):
 
 def test_cli_input_empty_dir_returns_1(tmp_path):
     assert main(["input", str(tmp_path)]) == 1
+
+
+def test_format_report_color_toggle(tmp_path):
+    _touch(tmp_path / "rec.avi")
+    _touch(tmp_path / "rec.csv", "Item5\n0.0\n0.05\n")
+    report = validate_input(tmp_path)
+    plain = format_report(report, color=False)
+    colored = format_report(report, color=True)
+    assert "\033[" not in plain
+    assert "\033[31m" in colored  # red, because predictions error out (no .slp)
+    assert "\033[0m" in colored
