@@ -1,9 +1,13 @@
 """Command-line entry point for the odor_search analysis pipeline.
 
-This is the Phase-0 scaffold: the argument surface (stages, ``--config``,
-``--run``) is wired up, but each stage is a stub that will be filled in during
-later phases (detection, tracking, QC, kinematics, behavior, stats, temporal,
-figures). Run ``odor-search --help`` to see the available commands.
+Two kinds of command:
+
+* ``input <path>`` — a pre-flight validator for a raw-data location. This is
+  implemented (see :mod:`odor_search.validate`).
+* the pipeline **stages** (``detect``, ``track``, ``qc``, …) — Phase-0 stubs
+  that will be filled in during later phases. Each takes ``--config``/``--run``.
+
+Run ``odor-search --help`` to see everything.
 """
 
 from __future__ import annotations
@@ -36,7 +40,28 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--version", action="version", version=f"odor-search {__version__}"
     )
-    sub = parser.add_subparsers(dest="command", metavar="STAGE")
+    sub = parser.add_subparsers(dest="command", metavar="COMMAND")
+
+    # Pre-flight input validation (implemented).
+    ip = sub.add_parser(
+        "input", help="Validate a raw-data location before running the pipeline"
+    )
+    ip.add_argument("path", help="Directory of recordings (or a single .avi) to validate")
+    ip.add_argument(
+        "--predictions-dir", metavar="DIR",
+        help="Where to look for .predictions.slp if not beside the video",
+    )
+    ip.add_argument(
+        "--time-column", default="Item5",
+        help="Elapsed-time column expected in the timing CSV (default: Item5)",
+    )
+    ip.add_argument(
+        "--min-frames", type=int, default=100,
+        help="Warn if an .slp has fewer labeled frames (default: 100)",
+    )
+    ip.add_argument("--json", action="store_true", help="Emit a JSON report")
+
+    # Pipeline stages (stubs for now).
     for name in STAGES:
         sp = sub.add_parser(name, help=f"Run the {name} stage")
         sp.add_argument(
@@ -50,6 +75,19 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _run_input(args: argparse.Namespace) -> int:
+    from .validate import format_report, report_to_json, validate_input
+
+    report = validate_input(
+        args.path,
+        predictions_dir=args.predictions_dir,
+        time_column=args.time_column,
+        min_slp_frames=args.min_frames,
+    )
+    print(report_to_json(report) if args.json else format_report(report))
+    return 0 if report.ok else 1
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -57,6 +95,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     if not args.command:
         parser.print_help()
         return 1
+
+    if args.command == "input":
+        return _run_input(args)
 
     print(
         f"[odor-search] stage '{args.command}' is not implemented yet "
