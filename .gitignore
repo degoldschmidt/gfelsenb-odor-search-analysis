@@ -217,3 +217,13 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 .DS_Store
+
+# --- odor-search project ---
+# Raw data and per-run outputs stay out of git (large, regenerable).
+/data/
+/runs/
+# Large binary artifacts anywhere in the tree.
+*.feather
+*.slp
+*.avi
+*.mp4

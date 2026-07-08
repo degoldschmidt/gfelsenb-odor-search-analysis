@@ -1,0 +1,56 @@
+[project]
+name = "odor-search-analysis"
+version = "0.1.0"
+description = "Analysis pipeline for odor-driven Drosophila local-search assays"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { file = "LICENSE" }
+authors = [{ name = "Dennis Goldschmidt", email = "goldschmidt.de@gmail.com" }]
+keywords = ["drosophila", "behavior", "sleap", "trajectory", "local-search", "olfaction"]
+
+dependencies = [
+    "numpy>=2.4.2",
+    "pandas>=3.0.0",
+    "scipy>=1.17.0",
+    "statsmodels>=0.14.6",
+    "opencv-python-headless>=4.13.0.92",
+    "sleap-io>=0.6.4",
+    "matplotlib>=3.10.8",
+    "seaborn>=0.13.2",
+    "pyarrow>=20.0.0",
+    "python-docx>=1.2.0",
+    "pydantic>=2.7",
+]
+
+[project.scripts]
+odor-search = "odor_search.cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.6",
+    "mypy>=1.11",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/odor_search"]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.mypy]
+python_version = "3.12"
+files = ["src"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
