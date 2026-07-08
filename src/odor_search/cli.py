@@ -52,6 +52,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="Where to look for .predictions.slp if not beside the video",
     )
     ip.add_argument(
+        "--timing-dir", metavar="DIR",
+        help="Where timing CSVs live if not beside the video (per-arena crops "
+             "resolve to the shared full-video CSV automatically)",
+    )
+    ip.add_argument(
+        "--log-dir", metavar="DIR",
+        help="Where log files (log_*.txt / *_log.txt) live if not beside the video",
+    )
+    ip.add_argument(
         "--time-column", default="Item5",
         help="Elapsed-time column expected in the timing CSV (default: Item5)",
     )
@@ -96,6 +105,8 @@ def _run_input(args: argparse.Namespace) -> int:
     report = validate_input(
         args.path,
         predictions_dir=args.predictions_dir,
+        timing_dir=args.timing_dir,
+        log_dir=args.log_dir,
         time_column=args.time_column,
         min_slp_frames=args.min_frames,
     )

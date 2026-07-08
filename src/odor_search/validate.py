@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import glob
 import json
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -132,10 +133,32 @@ def _check_video(video: Path) -> Check:
     return Check(LEVEL_OK, f"{n_frames} frames")
 
 
-def _check_timing(video: Path, time_column: str) -> Check:
-    csv = video.with_suffix(".csv")
-    if not csv.exists():
-        return Check(LEVEL_ERROR, f"timing CSV missing ({csv.name})")
+def _resolve_timing(video: Path, timing_dir: Path | None) -> Path | None:
+    """Locate the timing CSV.
+
+    Tries the video's exact stem first, then — for per-arena crops named
+    ``..._arenaN`` — the shared full-video CSV (suffix stripped), since one
+    timing file serves all four crops of a recording. Searches ``timing_dir``
+    if given, else the video's own directory.
+    """
+    search_dir = timing_dir if timing_dir is not None else video.parent
+    stem = _video_stem(video)
+    candidates = [search_dir / f"{stem}.csv"]
+    shared = re.sub(r"_arena\d+$", "", stem)
+    if shared != stem:
+        candidates.append(search_dir / f"{shared}.csv")
+    for csv in candidates:
+        if csv.exists():
+            return csv
+    return None
+
+
+def _check_timing(
+    video: Path, time_column: str, timing_dir: Path | None = None
+) -> Check:
+    csv = _resolve_timing(video, timing_dir)
+    if csv is None:
+        return Check(LEVEL_ERROR, f"timing CSV missing for {_video_stem(video)}")
     try:
         import pandas as pd
 
@@ -147,7 +170,7 @@ def _check_timing(video: Path, time_column: str) -> Check:
         return Check(LEVEL_ERROR, f"no '{time_column}' column (have: {have})")
     if len(df) == 0:
         return Check(LEVEL_ERROR, "timing CSV is empty")
-    return Check(LEVEL_OK, f"{len(df)} rows, '{time_column}' present")
+    return Check(LEVEL_OK, f"{csv.name}: {len(df)} rows, '{time_column}' present")
 
 
 def _check_predictions(
@@ -180,10 +203,13 @@ def _check_predictions(
     return Check(LEVEL_OK, f"{n_frames} frames; nodes: {node_str}")
 
 
-def _check_log(video: Path) -> Check:
-    logs = sorted(video.parent.glob("log_*.txt"))
+def _check_log(video: Path, log_dir: Path | None = None) -> Check:
+    search_dir = log_dir if log_dir is not None else video.parent
+    # Match both exp003 (`log_*.txt`) and Ana (`*_log.txt`) naming.
+    logs = sorted(search_dir.glob("log_*.txt")) + sorted(search_dir.glob("*_log.txt"))
     if not logs:
-        return Check(LEVEL_WARN, "no log_*.txt in the video's directory")
+        where = "the --log-dir" if log_dir is not None else "the video's directory"
+        return Check(LEVEL_WARN, f"no log file (log_*.txt / *_log.txt) in {where}")
     return Check(LEVEL_OK, logs[0].name)
 
 
@@ -191,18 +217,27 @@ def validate_input(
     path: str | Path,
     *,
     predictions_dir: str | Path | None = None,
+    timing_dir: str | Path | None = None,
+    log_dir: str | Path | None = None,
     time_column: str = DEFAULT_TIME_COLUMN,
     min_slp_frames: int = DEFAULT_MIN_SLP_FRAMES,
 ) -> Report:
-    """Discover recordings under ``path`` and run all checks on each."""
+    """Discover recordings under ``path`` and run all checks on each.
+
+    ``predictions_dir`` / ``timing_dir`` / ``log_dir`` allow the crop-centric
+    layout where those files live in sibling directories rather than beside the
+    video (as in exp003).
+    """
     pred_dir = Path(predictions_dir) if predictions_dir is not None else None
+    tim_dir = Path(timing_dir) if timing_dir is not None else None
+    lg_dir = Path(log_dir) if log_dir is not None else None
     recordings: list[Recording] = []
     for video in find_videos(path):
         rec = Recording(video=video)
         rec.checks["video"] = _check_video(video)
-        rec.checks["timing"] = _check_timing(video, time_column)
+        rec.checks["timing"] = _check_timing(video, time_column, tim_dir)
         rec.checks["predictions"] = _check_predictions(video, pred_dir, min_slp_frames)
-        rec.checks["log"] = _check_log(video)
+        rec.checks["log"] = _check_log(video, lg_dir)
         recordings.append(rec)
     return Report(root=Path(path), recordings=recordings)
 

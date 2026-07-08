@@ -92,6 +92,25 @@ def test_cli_input_empty_dir_returns_1(tmp_path):
     assert main(["input", str(tmp_path)]) == 1
 
 
+def test_timing_shared_across_arena_crops(tmp_path):
+    # crop in cropped_videos/, shared CSV in timing/ named without the _arenaN suffix
+    crop = tmp_path / "cropped_videos" / "localsearch_2026-05-28T16_20_20_arena3.avi"
+    _touch(crop)
+    _touch(tmp_path / "timing" / "localsearch_2026-05-28T16_20_20.csv", "Item5\n0.0\n0.05\n")
+    chk = _check_timing(crop, "Item5", tmp_path / "timing")
+    assert chk.level == validate.LEVEL_OK
+    assert "16_20_20.csv" in chk.detail  # matched the shared (stripped) CSV
+
+
+def test_log_dir_and_ana_naming(tmp_path):
+    crop = tmp_path / "cropped_videos" / "localsearch_2026-05-28T16_20_20_arena1.avi"
+    _touch(crop)
+    # Ana-style name (`*_log.txt`) in a separate metadata dir
+    _touch(tmp_path / "metadata" / "260528_log.txt")
+    assert _check_log(crop, tmp_path / "metadata").level == validate.LEVEL_OK
+    assert _check_log(crop, None).level == validate.LEVEL_WARN  # not beside the crop
+
+
 def test_format_report_color_toggle(tmp_path):
     _touch(tmp_path / "rec.avi")
     _touch(tmp_path / "rec.csv", "Item5\n0.0\n0.05\n")
